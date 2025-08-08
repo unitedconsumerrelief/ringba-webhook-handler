@@ -37,9 +37,10 @@ def ringba_webhook():
     try:
         # Handle different content types
         content_type = request.headers.get('Content-Type', '')
-        logging.info(f"Received request with Content-Type: {content_type}")
+        logging.info(f"Received request with Content-Type: '{content_type}'")
         
         # Try to get JSON data
+        data = None
         if 'application/json' in content_type:
             data = request.get_json()
         else:
@@ -49,9 +50,11 @@ def ringba_webhook():
             except:
                 # Try to parse raw data
                 try:
-                    data = json.loads(request.data.decode('utf-8'))
-                except:
-                    logging.error(f"Could not parse request data. Content-Type: {content_type}")
+                    raw_data = request.data.decode('utf-8')
+                    logging.info(f"Raw data received: {raw_data[:200]}...")
+                    data = json.loads(raw_data)
+                except Exception as e:
+                    logging.error(f"Could not parse request data. Content-Type: '{content_type}', Error: {str(e)}")
                     return jsonify({"error": "Invalid JSON data"}), 400
         
         if not data:
