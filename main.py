@@ -35,11 +35,34 @@ def health_check():
 @app.route("/ringba-webhook", methods=["POST"])
 def ringba_webhook():
     try:
-        # Handle different content types
+        # Log all request details
         content_type = request.headers.get('Content-Type', '')
-        logging.info(f"Received request with Content-Type: '{content_type}'")
+        content_length = request.headers.get('Content-Length', '0')
+        user_agent = request.headers.get('User-Agent', '')
         
-        # Try to get JSON data
+        logging.info(f"=== NEW WEBHOOK REQUEST ===")
+        logging.info(f"Content-Type: '{content_type}'")
+        logging.info(f"Content-Length: '{content_length}'")
+        logging.info(f"User-Agent: '{user_agent}'")
+        logging.info(f"Request Headers: {dict(request.headers)}")
+        
+        # Check if request has any data
+        raw_data = request.data
+        logging.info(f"Raw data length: {len(raw_data)} bytes")
+        
+        if len(raw_data) == 0:
+            logging.error("Request has no data - empty body")
+            return jsonify({"error": "Empty request body"}), 400
+        
+        # Try to decode and log the raw data
+        try:
+            raw_text = raw_data.decode('utf-8')
+            logging.info(f"Raw data: '{raw_text}'")
+        except Exception as e:
+            logging.error(f"Could not decode raw data: {str(e)}")
+            return jsonify({"error": "Invalid request encoding"}), 400
+        
+        # Try to parse JSON
         data = None
         if 'application/json' in content_type:
             data = request.get_json()
@@ -50,11 +73,9 @@ def ringba_webhook():
             except:
                 # Try to parse raw data
                 try:
-                    raw_data = request.data.decode('utf-8')
-                    logging.info(f"Raw data received: {raw_data[:200]}...")
-                    data = json.loads(raw_data)
+                    data = json.loads(raw_text)
                 except Exception as e:
-                    logging.error(f"Could not parse request data. Content-Type: '{content_type}', Error: {str(e)}")
+                    logging.error(f"Could not parse JSON. Raw text: '{raw_text}', Error: {str(e)}")
                     return jsonify({"error": "Invalid JSON data"}), 400
         
         if not data:
@@ -65,7 +86,7 @@ def ringba_webhook():
         target_name = data.get("targetName", "")
         caller_id = data.get("callerId", "Unknown")
         
-        logging.info(f"Received webhook: campaignName={campaign_name}, targetName={target_name}")
+        logging.info(f"Parsed data: campaignName='{campaign_name}', targetName='{target_name}', callerId='{caller_id}'")
         
         # Check if this call matches our filter
         if not passes_filter(campaign_name, target_name):
