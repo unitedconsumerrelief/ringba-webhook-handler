@@ -2,7 +2,7 @@ import requests
 from config import SLACK_WEBHOOK_URL
 import logging
 
-def send_slack_alert(caller_id, time_of_call, sheet_link):
+def send_slack_alert(caller_id, time_of_call, sheet_link, campaign_name="Unknown"):
     try:
         message = {
             "blocks": [
@@ -10,7 +10,7 @@ def send_slack_alert(caller_id, time_of_call, sheet_link):
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"📞 *New No Value Call Logged*\n\n• *Caller ID:* `{caller_id}`\n• *Time:* `{time_of_call} UTC`\n• *Campaign:* `{caller_id.split('_')[0] if '_' in caller_id else 'Unknown'}`"
+                        "text": f"📞 *New No Value Call Logged*\n\n• *Caller ID:* `{caller_id}`\n• *Time:* `{time_of_call} UTC`\n• *Campaign:* `{campaign_name}`"
                     }
                 },
                 {

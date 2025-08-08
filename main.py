@@ -18,10 +18,29 @@ logging.basicConfig(
 
 app = Flask(__name__)
 
-def passes_filter(campaign_name, target_name):
-    """Check if the call matches our filter criteria"""
-    return (campaign_name == RINGBA_FILTERS["campaign_name"] and 
-            target_name == RINGBA_FILTERS["target_name"])
+def passes_filter(campaign_name, target_name, call_length_from_connect=None):
+    """Check if the call matches our filter criteria.
+
+    A call is considered "No Value" if:
+    - campaign matches, and
+    - call_length_from_connect is 0 (numeric 0 or string that parses to 0)
+    Fallback: if target_name matches configured target_name exactly.
+    """
+    if campaign_name != RINGBA_FILTERS["campaign_name"]:
+        return False
+
+    # Preferred rule: Call length from connect equals zero
+    if call_length_from_connect is not None:
+        try:
+            # Accept ints, floats, numeric strings (e.g., "0", "0.0")
+            length_num = float(str(call_length_from_connect).strip())
+            if length_num == 0:
+                return True
+        except ValueError:
+            pass
+
+    # Fallback rule: exact target name match
+    return target_name == RINGBA_FILTERS["target_name"]
 
 @app.route("/", methods=["GET"])
 def health_check():
@@ -57,8 +76,9 @@ def ringba_webhook():
                 "message": "Empty request received - check Ringba webhook configuration",
                 "expected_format": {
                     "campaignName": "SPANISH DEBT | 3.5 STANDARD | 01292025",
-                    "targetName": "-no value-",
-                    "callerId": "example_caller_id"
+                    "targetName": "-no value- or actual target",
+                    "callerId": "example_caller_id",
+                    "callLengthFromConnect": 0
                 }
             }), 200
         
@@ -93,11 +113,12 @@ def ringba_webhook():
         campaign_name = data.get("campaignName", "")
         target_name = data.get("targetName", "")
         caller_id = data.get("callerId", "Unknown")
+        call_length_from_connect = data.get("callLengthFromConnect", data.get("CallLengthFromConnect", data.get("call_length_from_connect")))
         
-        logging.info(f"Parsed data: campaignName='{campaign_name}', targetName='{target_name}', callerId='{caller_id}'")
+        logging.info(f"Parsed data: campaignName='{campaign_name}', targetName='{target_name}', callerId='{caller_id}', callLengthFromConnect='{call_length_from_connect}'")
         
         # Check if this call matches our filter
-        if not passes_filter(campaign_name, target_name):
+        if not passes_filter(campaign_name, target_name, call_length_from_connect):
             logging.info(f"Call filtered out: campaignName={campaign_name}, targetName={target_name}")
             return jsonify({"status": "filtered", "message": "Call does not match filter criteria"}), 200
         
@@ -112,7 +133,7 @@ def ringba_webhook():
         
         # Send Slack notification
         sheet_link = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}"
-        slack_success = send_slack_alert(caller_id, time_of_call, sheet_link)
+        slack_success = send_slack_alert(caller_id, time_of_call, sheet_link, campaign_name)
         if not slack_success:
             logging.error("Failed to send Slack notification")
             # Don't fail the webhook if Slack fails
