@@ -53,7 +53,7 @@ def ringba_webhook():
             return jsonify({"status": "filtered", "message": "Call does not match filter criteria"}), 200
         
         # Process the call
-        time_of_call = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        time_of_call = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         
         # Append to Google Sheet
         sheet_success = append_row_to_sheet(time_of_call, caller_id)
