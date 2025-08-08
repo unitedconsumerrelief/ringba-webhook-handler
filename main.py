@@ -51,8 +51,16 @@ def ringba_webhook():
         logging.info(f"Raw data length: {len(raw_data)} bytes")
         
         if len(raw_data) == 0:
-            logging.error("Request has no data - empty body")
-            return jsonify({"error": "Empty request body"}), 400
+            logging.warning("Request has no data - empty body. This might be a Ringba configuration issue.")
+            return jsonify({
+                "status": "received",
+                "message": "Empty request received - check Ringba webhook configuration",
+                "expected_format": {
+                    "campaignName": "SPANISH DEBT | 3.5 STANDARD | 01292025",
+                    "targetName": "-no value-",
+                    "callerId": "example_caller_id"
+                }
+            }), 200
         
         # Try to decode and log the raw data
         try:
