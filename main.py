@@ -18,26 +18,31 @@ logging.basicConfig(
 
 app = Flask(__name__)
 
-def passes_filter(campaign_name, target_name, call_length_from_connect=None):
+def passes_filter(campaign_name, target_name, call_length_from_connect=None, end_call_source=None):
     """Check if the call matches our filter criteria.
 
     A call is considered "No Value" if:
     - campaign matches, and
-    - call_length_from_connect is 0 (numeric 0 or string that parses to 0)
+    - call_length_from_connect is 0, or
+    - end_call_source == "system"
     Fallback: if target_name matches configured target_name exactly.
     """
     if campaign_name != RINGBA_FILTERS["campaign_name"]:
         return False
 
-    # Preferred rule: Call length from connect equals zero
+    # Rule 1: Call length from connect equals zero
     if call_length_from_connect is not None:
         try:
-            # Accept ints, floats, numeric strings (e.g., "0", "0.0")
             length_num = float(str(call_length_from_connect).strip())
             if length_num == 0:
                 return True
         except ValueError:
             pass
+
+    # Rule 2: End call source equals "system"
+    if end_call_source is not None:
+        if str(end_call_source).strip().lower() == "system":
+            return True
 
     # Fallback rule: exact target name match
     return target_name == RINGBA_FILTERS["target_name"]
@@ -78,7 +83,8 @@ def ringba_webhook():
                     "campaignName": "SPANISH DEBT | 3.5 STANDARD | 01292025",
                     "targetName": "-no value- or actual target",
                     "callerId": "example_caller_id",
-                    "callLengthFromConnect": 0
+                    "callLengthFromConnect": 0,
+                    "endCallSource": "system"
                 }
             }), 200
         
@@ -114,11 +120,12 @@ def ringba_webhook():
         target_name = data.get("targetName", "")
         caller_id = data.get("callerId", "Unknown")
         call_length_from_connect = data.get("callLengthFromConnect", data.get("CallLengthFromConnect", data.get("call_length_from_connect")))
+        end_call_source = data.get("endCallSource", data.get("EndCallSource", data.get("end_call_source")))
         
-        logging.info(f"Parsed data: campaignName='{campaign_name}', targetName='{target_name}', callerId='{caller_id}', callLengthFromConnect='{call_length_from_connect}'")
+        logging.info(f"Parsed data: campaignName='{campaign_name}', targetName='{target_name}', callerId='{caller_id}', callLengthFromConnect='{call_length_from_connect}', endCallSource='{end_call_source}'")
         
         # Check if this call matches our filter
-        if not passes_filter(campaign_name, target_name, call_length_from_connect):
+        if not passes_filter(campaign_name, target_name, call_length_from_connect, end_call_source):
             logging.info(f"Call filtered out: campaignName={campaign_name}, targetName={target_name}")
             return jsonify({"status": "filtered", "message": "Call does not match filter criteria"}), 200
         
