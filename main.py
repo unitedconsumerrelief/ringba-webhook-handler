@@ -35,8 +35,25 @@ def health_check():
 @app.route("/ringba-webhook", methods=["POST"])
 def ringba_webhook():
     try:
-        # Log the incoming webhook
-        data = request.get_json()
+        # Handle different content types
+        content_type = request.headers.get('Content-Type', '')
+        logging.info(f"Received request with Content-Type: {content_type}")
+        
+        # Try to get JSON data
+        if 'application/json' in content_type:
+            data = request.get_json()
+        else:
+            # Try to parse as JSON anyway
+            try:
+                data = request.get_json(force=True)
+            except:
+                # Try to parse raw data
+                try:
+                    data = json.loads(request.data.decode('utf-8'))
+                except:
+                    logging.error(f"Could not parse request data. Content-Type: {content_type}")
+                    return jsonify({"error": "Invalid JSON data"}), 400
+        
         if not data:
             logging.error("No JSON data received")
             return jsonify({"error": "No JSON data received"}), 400
