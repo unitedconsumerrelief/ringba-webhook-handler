@@ -59,6 +59,13 @@ def health_check():
 @app.route("/ringba-webhook", methods=["POST"])
 def ringba_webhook():
     try:
+        # Handle Slack URL verification challenge
+        data = request.get_json()
+        if data and data.get("type") == "url_verification":
+            challenge = data.get("challenge")
+            if challenge:
+                return jsonify({"challenge": challenge}), 200
+        
         # Log all request details
         content_type = request.headers.get('Content-Type', '')
         content_length = request.headers.get('Content-Length', '0')
@@ -101,11 +108,9 @@ def ringba_webhook():
         if 'application/json' in content_type:
             data = request.get_json()
         else:
-            # Try to parse as JSON anyway
             try:
                 data = request.get_json(force=True)
             except:
-                # Try to parse raw data
                 try:
                     data = json.loads(raw_text)
                 except Exception as e:
@@ -143,7 +148,6 @@ def ringba_webhook():
         slack_success = send_slack_alert(caller_id, time_of_call, sheet_link, campaign_name)
         if not slack_success:
             logging.error("Failed to send Slack notification")
-            # Don't fail the webhook if Slack fails
         
         logging.info(f"Successfully processed call from {caller_id}")
         
