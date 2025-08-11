@@ -128,10 +128,11 @@ def ringba_webhook():
         if ringba_timestamp:
             time_of_call = ringba_timestamp
         else:
-            # Convert UTC server time to EST local time
+            # Convert UTC server time to Eastern time (handles DST automatically)
             utc_time = datetime.datetime.now(datetime.UTC)
-            est_time = utc_time.astimezone(datetime.timezone(datetime.timedelta(hours=-5)))  # EST is UTC-5
-            time_of_call = est_time.strftime("%Y-%m-%d %I:%M:%S %p EST")
+            # Use EDT (UTC-4) for Daylight Saving Time
+            eastern_time = utc_time.astimezone(datetime.timezone(datetime.timedelta(hours=-4)))  # EDT is UTC-4
+            time_of_call = eastern_time.strftime("%Y-%m-%d %I:%M:%S %p EDT")
         
         # Append to Google Sheet
         sheet_success = append_row_to_sheet(time_of_call, caller_id)
