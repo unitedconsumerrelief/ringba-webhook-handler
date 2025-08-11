@@ -123,12 +123,12 @@ def ringba_webhook():
             logging.info(f"Call filtered out: campaignName={campaign_name}, targetName={target_name}")
             return jsonify({"status": "filtered", "message": "Call does not match filter criteria"}), 200
         
-        # Process the call - use Ringba's timestamp if available, otherwise use current time
+        # Process the call - use Ringba's timestamp if available, otherwise use current local time
         ringba_timestamp = data.get("timestamp") or data.get("callTime") or data.get("callDate")
         if ringba_timestamp:
             time_of_call = ringba_timestamp
         else:
-            time_of_call = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+            time_of_call = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S EST")
         
         # Append to Google Sheet
         sheet_success = append_row_to_sheet(time_of_call, caller_id)
