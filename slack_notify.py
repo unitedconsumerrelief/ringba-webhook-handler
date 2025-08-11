@@ -10,7 +10,7 @@ def send_slack_alert(caller_id, time_of_call, sheet_link, campaign_name="Unknown
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"📞 *New No Value Call Logged*\n\n• *Caller ID:* `{caller_id}`\n• *Time:* `{time_of_call} UTC`\n• *Campaign:* `{campaign_name}`"
+                        "text": f"📞 *New No Value Call Logged*\n\n• *Caller ID:* `{caller_id}`\n• *Time:* `{time_of_call}`\n• *Campaign:* `{campaign_name}`"
                     }
                 },
                 {
