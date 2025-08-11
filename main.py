@@ -23,15 +23,20 @@ def passes_filter(campaign_name, target_name, call_length_from_connect=None, end
 
     A call is considered "No Value" if:
     - campaign matches, and
-    - call_length_from_connect is 0, or
+    - call_length_from_connect is 0 or empty string, or
+    - target_name is empty string, or
     - end_call_source == "system"
     Fallback: if target_name matches configured target_name exactly.
     """
     if campaign_name != RINGBA_FILTERS["campaign_name"]:
         return False
 
-    # Rule 1: Call length from connect equals zero
+    # Rule 1: Call length from connect equals zero OR is empty string
     if call_length_from_connect is not None:
+        # Handle empty string case (Ringba sends "" for No Value calls)
+        if str(call_length_from_connect).strip() == "":
+            return True
+        
         try:
             length_num = float(str(call_length_from_connect).strip())
             if length_num == 0:
@@ -39,7 +44,11 @@ def passes_filter(campaign_name, target_name, call_length_from_connect=None, end
         except ValueError:
             pass
 
-    # Rule 2: End call source equals "system"
+    # Rule 2: Target name is empty string (Ringba sends "" for No Value calls)
+    if target_name is not None and str(target_name).strip() == "":
+        return True
+
+    # Rule 3: End call source equals "system"
     if end_call_source is not None:
         if str(end_call_source).strip().lower() == "system":
             return True
