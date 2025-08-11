@@ -20,20 +20,24 @@ app = Flask(__name__)
 
 def passes_filter(campaign_name, target_name, call_length_from_connect=None, end_call_source=None):
     """Check if the call matches our filter criteria.
-
+    
     A call is considered "No Value" if:
     - campaign matches, and
-    - call_length_from_connect is 0 or empty string, or
-    - target_name is empty string, or
-    - end_call_source == "system"
-    Fallback: if target_name matches configured target_name exactly.
+    - target_name is the specific allowed target OR empty string, AND
+    - (call_length_from_connect is 0/empty OR target_name is empty OR end_call_source is "system")
     """
     if campaign_name != RINGBA_FILTERS["campaign_name"]:
         return False
 
+    # NEW: Target name must be either the specific target OR empty
+    allowed_targets = ["TA7a8e20272b90487c8d420370c8477992"]  # Your specific target ID
+    
+    # Allow if target matches allowed list OR if target is empty (true No Value)
+    if target_name not in allowed_targets and str(target_name).strip() != "":
+        return False
+
     # Rule 1: Call length from connect equals zero OR is empty string
     if call_length_from_connect is not None:
-        # Handle empty string case (Ringba sends "" for No Value calls)
         if str(call_length_from_connect).strip() == "":
             return True
         
@@ -44,7 +48,7 @@ def passes_filter(campaign_name, target_name, call_length_from_connect=None, end
         except ValueError:
             pass
 
-    # Rule 2: Target name is empty string (Ringba sends "" for No Value calls)
+    # Rule 2: Target name is empty string (true No Value calls)
     if target_name is not None and str(target_name).strip() == "":
         return True
 
@@ -53,8 +57,7 @@ def passes_filter(campaign_name, target_name, call_length_from_connect=None, end
         if str(end_call_source).strip().lower() == "system":
             return True
 
-    # Fallback rule: exact target name match
-    return target_name == RINGBA_FILTERS["target_name"]
+    return False
 
 @app.route("/", methods=["GET"])
 def health_check():
