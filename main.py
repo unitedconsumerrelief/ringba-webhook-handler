@@ -21,43 +21,20 @@ app = Flask(__name__)
 def passes_filter(campaign_name, target_name, call_length_from_connect=None, end_call_source=None):
     """Check if the call matches our filter criteria.
     
-    A call is considered "No Value" if:
+    A call is considered "No Value" ONLY if:
     - campaign matches, and
-    - target_name is the specific allowed target OR empty string, AND
-    - (call_length_from_connect is 0/empty OR target_name is empty OR end_call_source is "system")
+    - target_name is empty/null (no target assigned)
+    
+    This ensures we only get TRUE No Value calls that never connected to any target.
     """
     if campaign_name != RINGBA_FILTERS["campaign_name"]:
         return False
-
-    # NEW: Target name must be either the specific target OR empty
-    allowed_targets = ["TA7a8e20272b90487c8d420370c8477992"]  # Your specific target ID
     
-    # Allow if target matches allowed list OR if target is empty (true No Value)
-    if target_name not in allowed_targets and str(target_name).strip() != "":
-        return False
-
-    # Rule 1: Call length from connect equals zero OR is empty string
-    if call_length_from_connect is not None:
-        if str(call_length_from_connect).strip() == "":
-            return True
-        
-        try:
-            length_num = float(str(call_length_from_connect).strip())
-            if length_num == 0:
-                return True
-        except ValueError:
-            pass
-
-    # Rule 2: Target name is empty string (true No Value calls)
-    if target_name is not None and str(target_name).strip() == "":
-        return True
-
-    # Rule 3: End call source equals "system"
-    if end_call_source is not None:
-        if str(end_call_source).strip().lower() == "system":
-            return True
-
-    return False
+    # ONLY allow calls with empty/null target names (true No Value calls)
+    if target_name and str(target_name).strip() != "":
+        return False  # Filter out any call with a target ID
+    
+    return True  # Allow true No Value calls
 
 @app.route("/", methods=["GET"])
 def health_check():
@@ -146,8 +123,12 @@ def ringba_webhook():
             logging.info(f"Call filtered out: campaignName={campaign_name}, targetName={target_name}")
             return jsonify({"status": "filtered", "message": "Call does not match filter criteria"}), 200
         
-        # Process the call
-        time_of_call = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+        # Process the call - use Ringba's timestamp if available, otherwise use current time
+        ringba_timestamp = data.get("timestamp") or data.get("callTime") or data.get("callDate")
+        if ringba_timestamp:
+            time_of_call = ringba_timestamp
+        else:
+            time_of_call = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
         
         # Append to Google Sheet
         sheet_success = append_row_to_sheet(time_of_call, caller_id)
