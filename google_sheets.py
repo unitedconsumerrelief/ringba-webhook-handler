@@ -38,10 +38,19 @@ def append_row_to_sheet(time_of_call, caller_id, call_type=""):
             sheet.append_row(correct_headers)
             logging.info("Created correct headers in Google Sheet (after error)")
         
-        new_row = [time_of_call, caller_id, call_type, "", "", ""]  # Call Type added, manual fields left empty
-        sheet.append_row(new_row, value_input_option="USER_ENTERED")
+        # Find next empty row by checking ONLY Column A (ignore formulas in other columns)
+        col_a_values = sheet.col_values(1)  # Get only Column A values
+        next_row = len([val for val in col_a_values if val]) + 1
         
-        logging.info(f"Successfully appended row for caller {caller_id} with call type {call_type}")
+        # Explicitly write to specific columns - this bypasses append_row() confusion
+        sheet.update(f'A{next_row}', time_of_call)
+        sheet.update(f'B{next_row}', caller_id)
+        sheet.update(f'C{next_row}', call_type)
+        sheet.update(f'D{next_row}', "")  # Agent Name
+        sheet.update(f'E{next_row}', "")  # Status
+        sheet.update(f'F{next_row}', "")  # Notes
+        
+        logging.info(f"Successfully appended row {next_row} for caller {caller_id} with call type {call_type}")
         return True
         
     except Exception as e:
