@@ -21,20 +21,32 @@ app = Flask(__name__)
 def passes_filter(campaign_name, target_name, call_length_from_connect=None, end_call_source=None):
     """Check if the call matches our filter criteria.
     
-    A call is considered "No Value" ONLY if:
-    - campaign matches, and
-    - target_name is empty/null (no target assigned)
+    A call is considered valid if it matches ONE of these criteria:
+    1. 0819 Target: campaign matches AND target_name is "TA7a8e20272b90487c8d420370c8477992" AND call length <= 30 seconds
+    2. True No Value: campaign matches AND target_name is empty/null (no target assigned)
     
-    This ensures we only get TRUE No Value calls that never connected to any target.
+    This ensures we get both 0819 target calls (30s and under) and TRUE No Value calls.
     """
     if campaign_name != RINGBA_FILTERS["campaign_name"]:
         return False
     
-    # ONLY allow calls with empty/null target names (true No Value calls)
-    if target_name and str(target_name).strip() != "":
-        return False  # Filter out any call with a target ID
+    # Check for 0819 target calls (30 seconds and under)
+    if target_name == "TA7a8e20272b90487c8d420370c8477992":
+        # For 0819 target, only allow calls 30 seconds and under
+        if call_length_from_connect is not None:
+            try:
+                call_length = int(call_length_from_connect)
+                if call_length <= 30:
+                    return True  # Allow 0819 target calls 30s and under
+            except (ValueError, TypeError):
+                pass
+        return False  # Filter out 0819 target calls over 30 seconds
     
-    return True  # Allow true No Value calls
+    # Check for true No Value calls (empty/null target names)
+    if not target_name or str(target_name).strip() == "":
+        return True  # Allow true No Value calls
+    
+    return False  # Filter out all other calls
 
 @app.route("/", methods=["GET"])
 def health_check():
@@ -123,6 +135,14 @@ def ringba_webhook():
             logging.info(f"Call filtered out: campaignName={campaign_name}, targetName={target_name}")
             return jsonify({"status": "filtered", "message": "Call does not match filter criteria"}), 200
         
+        # Determine call type for notifications and logging
+        if target_name == "TA7a8e20272b90487c8d420370c8477992":
+            call_type = "0819 Call"
+            logging.info(f"Processing 0819 target call: callerId={caller_id}, callLength={call_length_from_connect}s")
+        else:
+            call_type = "No Value"
+            logging.info(f"Processing No Value call: callerId={caller_id}")
+        
         # Process the call - use Ringba's timestamp if available, otherwise use current local time
         ringba_timestamp = data.get("timestamp") or data.get("callTime") or data.get("callDate")
         if ringba_timestamp:
@@ -135,21 +155,22 @@ def ringba_webhook():
             time_of_call = eastern_time.strftime("%Y-%m-%d %I:%M:%S %p EDT")
         
         # Append to Google Sheet
-        sheet_success = append_row_to_sheet(time_of_call, caller_id)
+        sheet_success = append_row_to_sheet(time_of_call, caller_id, call_type)
         if not sheet_success:
             logging.error("Failed to append to Google Sheet")
             return jsonify({"error": "Failed to update Google Sheet"}), 500
         
         # Send Slack notification
         sheet_link = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}"
-        slack_success = send_slack_alert(caller_id, time_of_call, sheet_link, campaign_name)
+        slack_success = send_slack_alert(caller_id, time_of_call, sheet_link, campaign_name, call_type)
         if not slack_success:
             logging.error("Failed to send Slack notification")
         
-        logging.info(f"Successfully processed call from {caller_id}")
+        logging.info(f"Successfully processed {call_type.lower()} from {caller_id}")
         
         return jsonify({
             "caller_id": caller_id,
+            "call_type": call_type,
             "status": "success",
             "time": time_of_call
         }), 200
